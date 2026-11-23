@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Bakery — Instructions and implementation</title>
+<style>
+:root{color-scheme:light;--ink:#322923;--muted:#70645a;--line:#dfd6c9;--green:#315e48;--paper:#fffdf9;--cream:#faf7f0}
+*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:16px/1.7 system-ui,sans-serif}header,main,footer{max-width:1040px;margin:auto;padding:28px 24px}header{padding-top:48px}h1,h2,h3{font-family:Georgia,serif;line-height:1.25}h1{font-size:42px;margin:10px 0}h2{font-size:29px;margin-top:0}h3{font-size:21px}a{color:var(--green)}p{margin:12px 0}nav{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:24px}.eyebrow{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--green);font-weight:700}section{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:26px;margin-bottom:24px;scroll-margin-top:20px}code{font:0.95em Consolas,monospace;background:#ede7dd;padding:2px 6px;border-radius:4px}pre{white-space:pre-wrap;background:#ede7dd;padding:16px;border-radius:8px}pre code{padding:0}li{margin:9px 0}.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse}td,th{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{color:var(--green);background:#f1f3ec}.note{border-left:4px solid var(--green);padding:10px 16px;background:#edf2ea}.muted,footer{color:var(--muted)}@media(max-width:600px){h1{font-size:32px}header,main,footer{padding:20px 14px}section{padding:18px}td,th{padding:9px}}@media print{body{background:white}nav,.open-app{display:none}header,main,footer{max-width:none;padding:12px}section{border:none;padding:0;border-radius:0}h2,h3{break-after:avoid}tr{break-inside:avoid}a{color:inherit}code,pre{background:#f3f3f3}}
+</style>
+</head>
+<body>
+<header>
+<div class="eyebrow">MGOC50 · Lecture 9</div>
+<h1>Home Bakery order desk</h1>
+<p>Instructions, fixed business rules, implementation details, and a comparison with the previous app.</p>
+<p class="open-app"><a href="http://127.0.0.1:8000">Open the bakery app</a></p>
+<nav aria-label="Contents"><a href="#start">Start</a><a href="#use">Using the app</a><a href="#rules">Rules</a><a href="#implementation">Implementation</a><a href="#comparison">Previous vs current</a><a href="#slides">Slide alignment</a><a href="#testing">Tests and backups</a></nav>
+</header>
+<main>
+<section id="start">
+<h2>Start and stop</h2>
+<ol>
+<li>Open this folder in File Explorer. Click its address bar, type <code>powershell</code>, and press Enter.</li>
+<li>Type <code>python app.py</code> and press Enter.</li>
+<li>Open <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a> in your browser.</li>
+</ol>
+<p>Keep the PowerShell window open while using the app. Press <code>Ctrl+C</code> there to stop it. Decisions save automatically in <code>bakery.db</code>. Repeat the steps to return later.</p>
+<p>If <code>python</code> is not recognized, try <code>py app.py</code>. If port 8000 is already occupied, stop the other server using it before starting this one. Python must be available; no extra packages are needed.</p>
+<p>This guide also opens directly by double-clicking <code>README.html</code>, or through the app's Help link.</p>
+</section>
+<section id="use">
+<h2>Using the app</h2>
+<h3>1. Check the displayed day and calendar</h3>
+<p>A fresh database starts on Monday, November 23, 2026, with 13 previously accepted orders and 25 supplied Instagram messages across Monday–Sunday. The saved classroom date controls arrivals and deadlines. Your computer clock does not advance the app.</p>
+<p>The calendar shows the displayed Monday–Sunday week: committed baking hours, available capacity, free hours, order counts, helper bookings, and each committed customer order with its product and quantity. Request cards show the pickup day's booked/free hours beside the decision buttons. Pending requests reserve no hours. The top sales and helper-cost totals cover this same week, using pickup dates.</p>
+<h3>2. Review the inbox</h3>
+<p>Click <b>Fetch messages</b> to process messages received up to the displayed day. Future messages stay unavailable. Fetching again does not duplicate orders. Each fetched message is checked using fixed rules. Eligible new orders remain in the inbox for your decision. Use <b>Accept order</b> individually, or <b>Reject request</b>, optionally adding a reason. Requests that fail the rules when fetched are automatically rejected and appear in the visible <b>Incompatible orders</b> section for that received day, with a permanent record in Decision history.</p>
+<p>Valid changes and cancellations apply automatically when their messages are fetched. A rejected change leaves the original order intact. Messages are processed by received date and message number; capacity is checked against work already accepted.</p>
+<h3>3. Book help when needed</h3>
+<p>Use <b>+ Helper</b> on an eligible calendar day, or expand <b>Book a helper for another date</b>. A helper costs $100 and adds four hours for that day. Book at least two calendar days ahead. One helper is allowed per day; the app does not offer helper cancellation.</p>
+<p class="note">Book before clicking Fetch messages if that inbox may need extra capacity. Unlike the earlier build, advancing the date does not fetch messages automatically, giving you a chance to book help first. Requests rejected when fetched stay rejected after a helper is booked. Already-pending eligible requests are reassessed when you accept them.</p>
+<h3>4. Accept remaining requests and advance</h3>
+<p>Fetch all arrived messages first; the advance button is disabled while any remain unfetched. Reject any requests you do not want. Then press <b>Accept all and go to next day</b>. The app performs these steps in one transaction:</p>
+<ol>
+<li>Check remaining arrived requests one by one, in message order. Accept each that fits; reject any that no longer meet the rules. Accepting one can consume the space another needs.</li>
+<li>Close the displayed day at a simulated 5 PM and mark its accepted pickups as <b>Picked up</b>.</li>
+<li>Move the classroom date forward one day. Review capacity and book help if needed, then click <b>Fetch messages</b> for that day.</li>
+</ol>
+<p>The button does not wait for real-world 5 PM. There is no undo-day button or manual pickup confirmation in this version. After Sunday, you can continue advancing, but there are no further supplied message files.</p>
+<h3>5. Record another request</h3>
+<p>Use <b>Record a request</b> to enter a new order, change or cancellation received on the displayed day. Cupcake quantities mean dozens; cake quantities mean individual cakes. Use positive whole numbers.</p>
+<p>For changes and cancellations, enter the original customer name and pickup date. Matching ignores letter case and must find exactly one accepted order. Changes replace its product and quantity. To move a pickup date, cancel the original order and enter a new request; both actions need sufficient notice. For cancellations, product and quantity are not used to change the order, but leave valid values in those required form fields.</p>
+<h3>6. Find, review and export</h3>
+<p>The order book can be filtered by customer/order number, pickup date and status. It contains every fetched new order, with Requested, Accepted, Rejected, Cancelled or Picked up status. Changes and cancellations link to the original order. The value/time columns describe the order itself; only committed statuses contribute to the weekly totals. CSV sales and baking minutes are zero for requested, rejected and cancelled orders.</p>
+<p><b>Decision history</b> retains original message text, outcomes, reasons and source identifiers. Its activity log records actions, including the Incompatible-to-Rejected transition. Valid and rejected changes/cancellations received today are also visible in their own section on the main page. <b>Export all orders (CSV)</b> exports the entire order book regardless of filters. In the database and export, <code>collected</code> means Picked up. A legacy <code>ready</code> status may remain from the previous app.</p>
+</section>
+<section id="rules">
+<h2>Business rules and totals</h2>
+<div class="tablewrap"><table><thead><tr><th>Product unit</th><th>Price</th><th>Baking time</th></tr></thead><tbody><tr><td>One dozen cupcakes</td><td>$40</td><td>30 minutes</td></tr><tr><td>One cake</td><td>$120</td><td>2 hours</td></tr></tbody></table></div>
+<ul>
+<li>One product per order. All baking happens on the pickup date.</li>
+<li>Base capacity is eight hours per day, rising to twelve with one helper.</li>
+<li>New orders, changes, cancellations and helper bookings need at least two calendar days' notice. Monday for Wednesday qualifies; Monday for Tuesday does not.</li>
+<li>Message notice uses its received date; helper notice uses the displayed booking date. Orders with pickup dates already past cannot be approved.</li>
+<li>Changes recalculate capacity without counting the original order twice. Cancellations release its baking time and remove its sales from totals.</li>
+<li>Only exactly one matching accepted order may be changed or cancelled. Previously picked-up, ready or cancelled orders do not qualify.</li>
+<li>Picked-up orders still count as work performed on their pickup date. Cancelled orders count toward neither used hours nor sales.</li>
+</ul>
+<p><b>Committed sales</b> is the value of accepted and picked-up orders for the displayed week, excluding cancellations. It is not a payment record. <b>Helper bookings</b> is that week's booked helper cost. <b>Sales less helpers</b> subtracts helper costs only; ingredients and other costs are not recorded, so this is not profit.</p>
+</section>
+<section id="implementation">
+<h2>Implementation details</h2>
+<p><code>app.py</code> contains the local HTTP server, source parsers, database setup/migration, rule checks, actions and page rendering. It uses Python's standard library: <code>http.server</code>, <code>sqlite3</code>, <code>csv</code>, <code>html.parser</code> and date utilities. The interface uses server-rendered HTML, CSS and ordinary forms; JavaScript is not required.</p>
+<h3>Files and imports</h3>
+<p><code>bakery.db</code> is the single persistent SQLite data file beside the app. A fresh database imports <code>existing_orders.csv</code> and <code>InstagramOrders_Monday.html</code> through <code>InstagramOrders_Sunday.html</code> once. Each message has a unique source identifier. Restarting preserves decisions; editing source files afterward does not reimport them.</p>
+<p>When starting with the previous database, the app preserves existing records and moves helper bookings into <code>days</code>. It adds any missing Requested/Rejected order rows for previously fetched new messages, retaining order numbers already assigned, saved decisions, helper bookings and the classroom date. Unfetched messages wait for the Fetch button; restarting does not advance the date or reset choices. This is a revision of the same app and database, not a separate installation. The saved <code>app.previous.py</code> and <code>README.previous.html</code> are reference copies; do not run the previous code against the migrated database.</p>
+<h3>Data model</h3>
+<div class="tablewrap"><table><thead><tr><th>Table or view</th><th>Purpose</th></tr></thead><tbody>
+<tr><td><code>orders</code></td><td>Order number, customer, product, quantity, pickup date, lifecycle status and source. Baking time required and order value are derived from product and quantity rather than stored again.</td></tr>
+<tr><td><code>days</code></td><td>One row per baking date, with the date a helper was booked, if any. Orders are associated with days by pickup date; triggers create missing day rows.</td></tr>
+<tr><td><code>requests</code></td><td>Original message, source, received date, requested product/quantity/date, type, decision, reason and a foreign-key link to an order where applicable.</td></tr>
+<tr><td><code>settings</code></td><td>Saved classroom date and initialization marker.</td></tr>
+<tr><td><code>audit</code></td><td>Activity records with the classroom date.</td></tr>
+<tr><td><code>day_summary</code> (view)</td><td>Calculates capacity, order count, baking minutes and sales from days and orders. These totals are not stored as duplicate fields.</td></tr>
+</tbody></table></div>
+<p>Hours are calculated in integer minutes, and prices use whole dollars. Each request is retained as an event; its raw text and parsed request fields represent what the customer asked at that time. Orders hold the current order facts. A change updates the existing order rather than creating another accepted order. There is one Orders row per new-order message, and changes/cancellations link to that same row.</p>
+<h3>States and actions</h3>
+<p>Fetching a valid new message creates an Orders row with <code>requested</code> status. An invalid one is created as <code>incompatible</code> and immediately transitions to <code>rejected</code>, recorded in the audit log. The linked message record is <code>pending</code>, <code>approved</code> or <code>rejected</code>. Accepting changes the same Orders row to <code>accepted</code>; rejecting changes it to <code>rejected</code>. An approved cancellation sets that order to <code>cancelled</code>. Closing the pickup day sets accepted orders to <code>collected</code>, displayed as Picked up.</p>
+<p><code>assess()</code> checks notice, target order and capacity. <code>fetch_arrivals()</code> checks newly arrived messages. <code>decide_request()</code> records approval/rejection and updates orders. <code>act()</code> handles form actions, and <code>render()</code> builds the page.</p>
+<p>Actions use SQLite transactions with <code>BEGIN IMMEDIATE</code> and check rules before writing, including each bulk acceptance. Failed actions roll back. Successful forms redirect to the main page to avoid repeating an action on refresh.</p>
+<h3>Local serving and scope</h3>
+<p>The server binds to <code>127.0.0.1:8000</code> and serves the app, this guide and the CSV export. It does not serve arbitrary folder files. SQL values use parameters; displayed user text is escaped; cross-origin form submissions are rejected; exported customer names that resemble spreadsheet formulas are protected.</p>
+<p>All automatic decisions are fixed rules. There is no AI, live Instagram connection, message sending, payment handling, customer ranking or automatic helper hiring. The Workflow Builder files are independent and are not used by the bakery app.</p>
+</section>
+<section id="comparison">
+<h2>How this differs from the previous app</h2>
+<p>The layout and core baking constraints remain similar. The main change is how much of the order lifecycle the backend carries out automatically.</p>
+<div class="tablewrap"><table><thead><tr><th>Area</th><th>Previous app</th><th>Current app</th></tr></thead><tbody>
+<tr><td>Incompatible messages</td><td>Stayed pending with a blocked explanation until the baker rejected them.</td><td>Automatically rejected when fetched, with the reason retained in history.</td></tr>
+<tr><td>Changes and cancellations</td><td>Baker clicked to approve or reject each request.</td><td>Valid requests apply automatically when fetched; invalid ones are rejected.</td></tr>
+<tr><td>Ending a day</td><td>Finish day was blocked until every arrived message was decided individually.</td><td>Accept all and go to next day checks remaining requests in sequence, accepts what fits, closes pickups and advances the date. Fetch messages is a separate action on the next day.</td></tr>
+<tr><td>Pickup tracking</td><td>Baker manually marked orders Ready, then Collected.</td><td>Closing the pickup day automatically marks orders Picked up at simulated 5 PM.</td></tr>
+<tr><td>Helper timing</td><td>A blocked pending request could be reassessed after booking help.</td><td>Helpers must be booked before a message is fetched if it would otherwise be rejected for capacity. Rejections are final in the interface.</td></tr>
+<tr><td>Requested/rejected order records</td><td>Only message records existed until a new order was accepted.</td><td>Every fetched new order has an Orders row from the Requested or Incompatible stage onward.</td></tr>
+<tr><td>Database model</td><td>Separate helper-booking table; daily usage calculated from orders.</td><td>Explicit days table holds helper bookings; a day_summary view calculates daily totals.</td></tr>
+<tr><td>Financial totals</td><td>Covered all imported and entered orders across dates.</td><td>Cover the displayed calendar week by pickup date.</td></tr>
+<tr><td>Calendar and layout</td><td>Weekly hours and helper controls, inbox/form columns and order book.</td><td>Same overall arrangement, with customer orders in each day, capacity beside decisions, explicit Fetch, visible incompatible/changes sections and helper price/time on the button.</td></tr>
+</tbody></table></div>
+<p>Both versions use the same prices, baking times, two-day notice rule, helper cost and capacity limits. Both provide manual request entry, order filters, history and CSV export. The current version follows the supplied classroom state/action framework more closely; the previous version gave the baker more individual confirmations.</p>
+</section>
+<section id="slides">
+<h2>Alignment with lecture slides 13–25</h2>
+<p>This review uses the printed slide numbers in MGOC50 Lecture 9_Final.pdf. The app keeps the supplied business constraints and the established layout, with these concrete mappings:</p>
+<div class="tablewrap"><table><thead><tr><th>Slides</th><th>Implementation</th></tr></thead><tbody>
+<tr><td>13, 17: objective and constraints</td><td>Orders, changes/cancellations, fixed prices/times, two calendar days of notice, 8-hour base capacity, optional $100/4-hour helper.</td></tr>
+<tr><td>14–15: software and README</td><td>Local Python app with no AI calls, and this HTML guide with usage and implementation details. Model/session suggestions in the lecture are development guidance rather than app features.</td></tr>
+<tr><td>18–20: aims and wireframe</td><td>Separate functions for page rendering, rules and storage. Fetch/accept/reject/helper actions, visible capacity and customer orders, incompatible messages, changes/cancellations and money summaries.</td></tr>
+<tr><td>21: data model</td><td>Orders link to Days by pickup date. Each message links to its affected order. Required hours, totals and counts are calculated rather than stored twice. day_summary answers Friday capacity and weekly revenue questions.</td></tr>
+<tr><td>22–24: lifecycle and actions</td><td>Requested → Accepted → Picked up; Requested → Rejected; Incompatible → Rejected automatically; valid fetched cancellations → Cancelled. Acceptance checks capacity sequentially. Helper booking sets daily capacity to twelve hours; derived day counts update with order status.</td></tr>
+<tr><td>25: staged build and tests</td><td>Plan, data/rules, UI, regression tests, then browser review. Full-week acceptance is tested both with base capacity and with helpers.</td></tr>
+</tbody></table></div>
+<p>Classroom interpretation: two days means calendar dates, and advancing the saved date simulates the 5 PM pickup event. Fetch reads the supplied local Instagram HTML records rather than connecting to a live account. No speculative features were added.</p>
+</section>
+<section id="testing">
+<h2>Tests, backups and verification limits</h2>
+<p>From this folder, run:</p>
+<pre><code>python -m unittest -v test_bakery.py</code></pre>
+<p>The 15 automated tests passed after the app changes. They cover imports/restarts, notice and future-message checks, helpers and duplicate bookings, capacity, changes/cancellations, pickup transitions, escaped user text, sequential bulk acceptance, derived daily totals, the full supplied week with and without helpers, explicit/idempotent fetching, isolation of manual entries from unfetched imports, saved-choice migration, lifecycle rows, noncommitted export totals and HTTP form/export behavior.</p>
+<p>Each test starts with a temporary SQLite backup of <code>bakery.db</code> and resets only that copy to the supplied source dataset. Tests do not change the real database and remain repeatable after you enter decisions. Database and source files must be present. The revised build was also checked in the in-app browser on a temporary database copy: desktop and phone widths, Monday acceptance/5 PM pickups, Tuesday fetching and the automatic Brown cancellation. No user orders were changed by those browser tests.</p>
+<p>To back up: stop the app and copy <code>bakery.db</code> somewhere safe. To restore: stop the app and replace it with your backup. There is no in-app reset or undo. Keep <code>app.py</code>, this guide and the eight source files together.</p>
+</section>
+</main>
+<footer>Home Bakery · Saved locally in bakery.db · <a href="http://127.0.0.1:8000">Open the order desk</a></footer>
+</body>
+</html>
